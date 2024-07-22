@@ -11,7 +11,7 @@ use crate::ap::messages::Connect;
 
 use super::messages::APMessage;
 
-pub async fn connect(dest: &str, port: &str) -> anyhow::Result<JoinHandle<()>> {
+pub async fn connect(dest: String, port: String) -> anyhow::Result<JoinHandle<()>> {
     let stream = match tokio_tungstenite::connect_async(format!("wss://{}:{}", dest, port)).await {
         Ok((stream, _)) => stream,
         Err(err) => {

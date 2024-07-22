@@ -1,5 +1,5 @@
-use iced::{Sandbox, Settings};
-use user_interface::Connexion;
+use iced::{Application, Settings};
+use user_interface::Context;
 
 mod ap;
 mod user_interface;
@@ -12,5 +12,5 @@ fn main() -> iced::Result {
         .finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
-    Connexion::run(Settings::default())
+    Context::run(Settings::default())
 }
