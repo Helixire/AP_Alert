@@ -38,6 +38,10 @@ impl Application for Context {
         String::from("AP_Alert")
     }
 
+    fn theme(&self) -> Self::Theme {
+        Theme::Dracula
+    }
+
     fn update(&mut self, message: Message) -> Command<Message> {
         match message {
             Message::Connect => {
