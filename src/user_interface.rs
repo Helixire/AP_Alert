@@ -7,13 +7,10 @@ use iced::{executor, Alignment, Application, Command, Element, Theme};
 use tokio::task::JoinHandle;
 use tracing::{error, info};
 
-use crate::ap::connection::connect;
+use crate::ap::connection::{connect, ConnectionInfo};
 
 pub struct Context {
-    pseudo: String,
-    server_ip: String,
-    server_port: String,
-    password: String,
+    connection_info: ConnectionInfo,
     connection_handle: Arc<RwLock<Option<JoinHandle<()>>>>,
 }
 
@@ -32,10 +29,7 @@ impl Application for Context {
     
     fn new(_flags: Self::Flags) -> (Self, Command<Self::Message>) {
         (Self {
-            pseudo: "".to_owned(),
-            server_ip: "".to_owned(),
-            server_port: "38281".to_owned(),
-            password: "".to_owned(),
+            connection_info: ConnectionInfo::default(),
             connection_handle: Arc::new(RwLock::new(None)),
         }, Command::none())
     }
@@ -49,7 +43,7 @@ impl Application for Context {
             Message::Connect => {
                 info!("attempting connexion");
                 let write_connection = self.connection_handle.clone();
-                Command::perform(connect(self.server_ip.clone(), self.server_port.clone()), move |ret|  {
+                Command::perform(connect(self.connection_info.clone()), move |ret|  {
                     match ret {
                         Ok(join) => {
                             write_connection.write().unwrap().replace(join);
@@ -60,22 +54,22 @@ impl Application for Context {
                 })
             },
             Message::PseudoInputChanged(updated_pseudo) => {
-                self.pseudo = updated_pseudo;
+                self.connection_info.slot = updated_pseudo;
                 
                 Command::none()
             }
             Message::ServerIPInputChanged(updated_server_ip) => {
-                self.server_ip = updated_server_ip;
+                self.connection_info.ip = updated_server_ip;
                 
                 Command::none()
             }
             Message::ServerPortInputChanged(updated_port) => {
-                self.server_port = updated_port;
+                self.connection_info.port = updated_port;
                 
                 Command::none()
             }
             Message::ServerPasswordInputChanged(updated_password) => {
-                self.password = updated_password;
+                self.connection_info.password = updated_password;
 
                 Command::none()
             }
@@ -84,10 +78,10 @@ impl Application for Context {
 
     fn view(&self) -> Element<Message> {
         column![
-            row![text("Pseudo: "), text_input("Pseudo", &self.pseudo).on_input(Message::PseudoInputChanged)],
-            row![text("Server IP: "), text_input("Server IP", &self.server_ip).on_input(Message::ServerIPInputChanged)],
-            row![text("Server port: "), text_input("Server port", &self.server_port).on_input(Message::ServerPortInputChanged)],
-            row![text("Server password: "), text_input("Server password", &self.password).on_input(Message::ServerPasswordInputChanged)],
+            row![text("Pseudo: "), text_input("Pseudo", &self.connection_info.slot).on_input(Message::PseudoInputChanged)],
+            row![text("Server IP: "), text_input("Server IP", &self.connection_info.ip).on_input(Message::ServerIPInputChanged)],
+            row![text("Server port: "), text_input("Server port", &self.connection_info.port).on_input(Message::ServerPortInputChanged)],
+            row![text("Server password: "), text_input("Server password", &self.connection_info.password).on_input(Message::ServerPasswordInputChanged)],
             button("Connect").on_press(Message::Connect)
         ]
         .padding(20)
