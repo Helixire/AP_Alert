@@ -20,7 +20,7 @@ impl Default for ConnectionInfo {
     fn default() -> Self {
         Self {
             ip: "127.0.0.1".to_owned(),
-            port: "3828".to_owned(),
+            port: "38281".to_owned(),
             slot: Default::default(),
             password: Default::default(),
         }

@@ -1,8 +1,8 @@
 use iced::{Application, Settings};
-use user_interface::Context;
+use page::Page;
 
 mod ap;
-mod user_interface;
+mod page;
 
 fn main() -> iced::Result {
     let subscriber = tracing_subscriber::fmt()
@@ -12,5 +12,5 @@ fn main() -> iced::Result {
         .finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
-    Context::run(Settings::default())
+    Page::run(Settings::default())
 }
