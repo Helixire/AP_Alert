@@ -14,7 +14,7 @@
       {
         defaultPackage = naersk-lib.buildPackage ./.;
         devShell = with pkgs; mkShell rec {
-          buildInputs = [ cargo rustc rustfmt pre-commit rustPackages.clippy openssl wayland libxkbcommon vulkan-loader ];
+          buildInputs = [ cargo rustc rustfmt pre-commit rustPackages.clippy wayland libxkbcommon vulkan-loader ];
           nativeBuildInputs = with pkgs; [ pkg-config ];
           RUST_SRC_PATH = rustPlatform.rustLibSrc;
           LD_LIBRARY_PATH = "${lib.makeLibraryPath buildInputs}";
