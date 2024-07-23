@@ -4,7 +4,7 @@ use tracing::{error, info};
 
 use crate::ap::connection::connect;
 
-use super::{Context, Message, View};
+use super::{Context, Message, Pages, View};
 
 pub struct Auth {}
 
@@ -116,9 +116,9 @@ impl View for Auth {
             }
             Message::Connected => {
                 context.save();
-
-                Command::none()
+                Command::perform(async{}, |_| Message::ChangePage(Pages::Dashboard))
             }
+            _ => { Command::none() }
         }
     }
 }

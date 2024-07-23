@@ -1,4 +1,5 @@
 mod auth;
+mod dashboard;
 
 use std::path::PathBuf;
 
@@ -8,6 +9,7 @@ use tracing::info;
 
 use crate::ap::connection::ConnectionInfo;
 use auth::Auth;
+use dashboard::Dashboard;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Context {
@@ -20,12 +22,19 @@ pub struct Page {
 }
 
 #[derive(Debug, Clone)]
+enum Pages {
+    Connection,
+    Dashboard,
+}
+
+#[derive(Debug, Clone)]
 pub enum Message {
     PseudoInputChanged(String),
     ServerIPInputChanged(String),
     ServerPortInputChanged(String),
     ServerPasswordInputChanged(String),
     Error(String),
+    ChangePage(Pages),
     Connected,
     Connect,
 }
@@ -95,7 +104,20 @@ impl Application for Page {
     }
 
     fn update(&mut self, message: Message) -> Command<Message> {
-        self.cur_view.update(message, &mut self.context)
+        match message {
+            Message::ChangePage(page) => {
+                match page {
+                    Pages::Connection => {
+                        self.cur_view = Box::new(Auth {});
+                    },
+                    Pages::Dashboard => {
+                        self.cur_view = Box::new(Dashboard {});
+                    },
+                }
+                Command::none()
+            }
+            _ => self.cur_view.update(message, &mut self.context)
+        }
     }
 
     fn view(&self) -> Element<Message> {

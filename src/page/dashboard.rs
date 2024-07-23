@@ -1,37 +1,37 @@
-use iced::{Application, Theme, executor};
+use std::fmt::format;
 
-struct Dashboard {
+use iced::{widget::row, Command};
+use iced::widget::{image, text, text_input, Space};
+use tracing::{error, info};
 
+use super::{Context, Message, View};
+
+pub struct Dashboard {
 }
 
-#[derive(Debug)]
-enum Message {
-    Reload,
-    Exit,
-}
-
-impl Application for Dashboard {
-    type Executor = executor::Default;
-
-    type Message = Message;
-
-    type Theme = Theme;
-
-    type Flags = ();
-
-    fn new(flags: Self::Flags) -> (Self, iced::Command<Self::Message>) {
-        todo!()
-    }
-
+impl View for Dashboard {
     fn title(&self) -> String {
-        todo!()
+        String::from("AP_Alert")
     }
 
-    fn update(&mut self, message: Self::Message) -> iced::Command<Self::Message> {
-        todo!()
+    fn update(&mut self, message: super::Message, context: &mut super::Context) -> iced::Command<super::Message> {
+        match message {
+            _ => Command::none()
+        }
     }
 
-    fn view(&self) -> iced::Element<'_, Self::Message, Self::Theme, iced::Renderer> {
-        todo!()
+    fn view(&self, context: &super::Context) -> iced::Element<super::Message> {
+        iced::widget::container::Container::new(
+            row![
+                text(format!("Slot: {} - Server: {}:{}", context.connection_info.slot, context.connection_info.ip, context.connection_info.port))
+                    .horizontal_alignment(iced::alignment::Horizontal::Right),
+                Space::with_width(100)
+
+            ]
+        )
+        .center_y()
+        .center_x()
+        .into()
     }
+
 }
