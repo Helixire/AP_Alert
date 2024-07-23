@@ -7,13 +7,15 @@ use iced::{executor, Application, Command, Element, Theme};
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
-use crate::ap::connection::ConnectionInfo;
+use crate::ap::connection::{self, connect, ConnectionInfo};
 use auth::Auth;
 use dashboard::Dashboard;
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Default, Debug, Deserialize, Serialize)]
 pub struct Context {
     pub connection_info: ConnectionInfo,
+    #[serde(skip)]
+    pub worker_channel: Option<connection::Connection>,
 }
 
 pub struct Page {
@@ -22,7 +24,7 @@ pub struct Page {
 }
 
 #[derive(Debug, Clone)]
-enum Pages {
+pub enum Pages {
     Connection,
     Dashboard,
 }
@@ -35,7 +37,7 @@ pub enum Message {
     ServerPasswordInputChanged(String),
     Error(String),
     ChangePage(Pages),
-    Connected,
+    WSEvent(connection::Event),
     Connect,
 }
 
@@ -57,14 +59,12 @@ impl Context {
             Ok(file) => {
                 match serde_json::from_reader(file) {
                     Ok(s) => s,
-                    Err(_) => Self { connection_info: ConnectionInfo::default() },
+                    Err(_) => Self::default(),
                 }
             },
             Err(_) => {
                 info!("Could not load save File, using default");
-                Self {
-                    connection_info: ConnectionInfo::default(),
-                }
+                Self::default()
             },
         }
     }
@@ -115,13 +115,22 @@ impl Application for Page {
                     },
                 }
                 Command::none()
-            }
+            },
+            Message::WSEvent(connection::Event::WorkerReady(con)) => {
+                self.context.worker_channel.replace(con);
+
+                Command::none()
+            },
             _ => self.cur_view.update(message, &mut self.context)
         }
     }
 
     fn view(&self) -> Element<Message> {
         self.cur_view.view(&self.context)
+    }
+
+    fn subscription(&self) -> iced::Subscription<Self::Message> {
+        connect().map(Message::WSEvent)
     }
 
     type Executor = executor::Default;
