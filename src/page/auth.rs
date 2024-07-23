@@ -54,17 +54,26 @@ impl View for Auth {
 
             Message::Connect => {
                 info!("attempting connexion");
-                let write_connection = context.connection_handle.clone();
                 Command::perform(connect(context.connection_info.clone()), move |ret|  {
                     match ret {
                         Ok(join) => {
-                            write_connection.write().unwrap().replace(join);
+                            Message::Connected
                         },
-                        Err(err) => error!("Could not connect: {:?}", err), // TODO Write message for user to see 
-                    };
-                    Message::PseudoInputChanged("POPO".to_owned()) // TODO Change state of client to 
+                        Err(err) => Message::Error(err.to_string()) 
+                    }
                 })
             }
+
+            Message::Error(err) => {
+                error!("{}", err);
+                
+                Command::none()
+            },
+            Message::Connected => {
+                context.save();
+
+                Command::none()
+            },
         }
     }
 }

@@ -1,5 +1,6 @@
 use futures_util::{stream::FuturesUnordered, SinkExt, StreamExt};
 
+use serde::{Deserialize, Serialize};
 use tokio::{net::TcpStream, task::JoinHandle};
 use tokio_tungstenite::{tungstenite::Message, MaybeTlsStream, WebSocketStream};
 use tracing::{debug, error, info};
@@ -8,7 +9,7 @@ use crate::ap::messages::Connect;
 
 use super::messages::APMessage;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConnectionInfo {
     pub ip: String,
     pub port: String,

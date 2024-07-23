@@ -11,6 +11,6 @@ fn main() -> iced::Result {
         .with_line_number(true)
         .finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
-
+    
     Page::run(Settings::default())
 }
