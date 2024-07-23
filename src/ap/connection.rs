@@ -1,9 +1,10 @@
-use futures_util::{stream::FuturesUnordered, SinkExt, StreamExt};
+use futures_util::{select, SinkExt, StreamExt};
 
+use iced::{futures::channel::mpsc, subscription};
 use serde::{Deserialize, Serialize};
-use tokio::{net::TcpStream, task::JoinHandle};
+use tokio::net::TcpStream;
 use tokio_tungstenite::{tungstenite::Message, MaybeTlsStream, WebSocketStream};
-use tracing::{debug, error, info};
+use tracing::{error, info};
 
 use crate::ap::messages::Connect;
 
@@ -28,7 +29,116 @@ impl Default for ConnectionInfo {
     }
 }
 
-pub async fn connect(connection_info: ConnectionInfo) -> anyhow::Result<JoinHandle<()>> {
+#[derive(Debug, Clone)]
+pub enum Event {
+    WorkerReady(Connection),
+    APMessage(super::messages::APMessage),
+}
+
+#[derive(Debug, Clone)]
+pub struct Connection(pub mpsc::Sender<InputMessage>);
+
+impl Connection {
+    pub fn send(&mut self, message: InputMessage) {
+        self.0
+            .try_send(message)
+            .expect("Send message to echo server");
+    }
+}
+
+pub enum InputMessage {
+    Connect(ConnectionInfo),
+}
+
+enum State {
+    Disconnected,
+    Connected(WebSocketStream<MaybeTlsStream<TcpStream>>),
+}
+
+pub fn connect() -> iced::Subscription<Event> {
+    struct WS;
+
+    subscription::channel(std::any::TypeId::of::<WS>(), 100, |mut output| async move {
+        let mut state = State::Disconnected;
+        let mut connection_info = None;
+
+        let (sender, mut receiver) = mpsc::channel(100);
+
+        let _ = output.send(Event::WorkerReady(Connection(sender))).await;
+
+        loop {
+            match &mut state {
+                State::Disconnected => {
+                    if let Some(connection_info) = &connection_info {
+                        match connect_to_ws(connection_info).await {
+                            Err(err) => {
+                                error!("{}", err);
+                            }
+                            Ok(server) => {
+                                state = State::Connected(server);
+                            }
+                        }
+                    }
+
+                    match receiver.select_next_some().await {
+                        InputMessage::Connect(info) => connection_info = Some(info),
+                    };
+                }
+                State::Connected(server) => {
+                    let mut fused_websocket = server.by_ref().fuse();
+
+                    select! {
+                        message = fused_websocket.select_next_some() => {
+                            match message {
+                                Ok(Message::Text(t)) => {
+                                    match serde_json::from_str::<Vec<APMessage>>(&t) {
+                                        Err(err) => error!("Failed converting to APMessage {:?}", err),
+                                        Ok(messages) => {
+                                            for message in messages {
+                                                match message {
+                                                    APMessage::RoomInfo(_) => {
+                                                        if let Some(info) = &connection_info {
+                                                            let message = APMessage::Connect(Connect {
+                                                                name: info.slot.clone(),
+                                                                password: info.password.clone(),
+                                                                ..Default::default()
+                                                            });
+                                                            if let Err(err) = fused_websocket.send(Message::Text(serde_json::to_string(&[message]).unwrap())).await {
+                                                                error!("{}", err);
+                                                            }
+                                                        }
+                                                    },
+                                                    _ => {
+                                                        let _ = output.send(Event::APMessage(message)).await;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                Err(_) => state = State::Disconnected,
+                                Ok(_) => {},
+                            }
+                        }
+
+                        gui_event = receiver.select_next_some() => {
+                            match gui_event {
+                                InputMessage::Connect(info) => {
+                                    connection_info.replace(info);
+                                    state = State::Disconnected;
+                                },
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    })
+}
+
+async fn connect_to_ws(
+    connection_info: &ConnectionInfo,
+) -> anyhow::Result<WebSocketStream<MaybeTlsStream<TcpStream>>> {
     let stream = match tokio_tungstenite::connect_async(format!(
         "wss://{}:{}",
         connection_info.ip, connection_info.port
@@ -50,70 +160,5 @@ pub async fn connect(connection_info: ConnectionInfo) -> anyhow::Result<JoinHand
         }
     };
     info!("Connected");
-
-    Ok(tokio::spawn(handle_ws(connection_info, stream)))
-}
-
-async fn on_ap_event(
-    connection_info: &ConnectionInfo,
-    event: APMessage,
-) -> Option<impl Iterator<Item = APMessage>> {
-    debug!("{:?}", event);
-    match event {
-        APMessage::RoomInfo(_) => {
-            let message = APMessage::Connect(Connect {
-                name: connection_info.slot.clone(),
-                password: connection_info.password.clone(),
-                ..Default::default()
-            });
-            return Some([message].into_iter());
-        }
-        APMessage::Connect(_) => todo!(),
-    }
-}
-
-async fn handle_ws(
-    connection_info: ConnectionInfo,
-    connection: WebSocketStream<MaybeTlsStream<TcpStream>>,
-) {
-    let (mut write, mut read) = connection.split();
-    loop {
-        match read.next().await {
-            None => {
-                info!("Connection closed !!");
-                break;
-            }
-            Some(res) => match res {
-                Err(err) => error!("Error : {}", err),
-                Ok(mes) => match mes {
-                    Message::Text(text) => {
-                        debug!("Recived Message : {}", text);
-                        match serde_json::from_str::<Vec<APMessage>>(&text) {
-                            Err(err) => error!("Failed converting to APMessage {:?}", err),
-                            Ok(messages) => {
-                                let mut futures = messages
-                                    .into_iter()
-                                    .map(|m| on_ap_event(&connection_info, m))
-                                    .collect::<FuturesUnordered<_>>();
-                                let mut messages = vec![];
-
-                                while let Some(ret) = futures.next().await {
-                                    if let Some(m) = ret {
-                                        messages.extend(m);
-                                    }
-                                }
-                                if !messages.is_empty() {
-                                    let text = serde_json::to_string(&messages).unwrap();
-                                    debug!("{}", serde_json::to_string_pretty(&messages).unwrap());
-                                    write.send(Message::Text(text)).await.unwrap();
-                                }
-                            }
-                        }
-                    }
-                    Message::Close(_) => break,
-                    _ => {}
-                },
-            },
-        }
-    }
+    Ok(stream)
 }

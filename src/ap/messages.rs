@@ -1,18 +1,24 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RoomInfo {
     pub password: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "cmd")]
 pub enum APMessage {
     RoomInfo(RoomInfo),
     Connect(Connect),
+    Connected(Connected)
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Connected {
+    
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "class")]
 pub struct Version {
     pub major: u32,
@@ -20,7 +26,7 @@ pub struct Version {
     pub build: u32,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 
 pub struct Connect {
     pub name: String,

@@ -2,7 +2,7 @@ use iced::widget::{button, column, row, text, text_input, Space};
 use iced::{Alignment, Command, Element, Length};
 use tracing::{error, info};
 
-use crate::ap::connection::connect;
+use crate::ap::connection;
 
 use super::{Context, Message, Pages, View};
 
@@ -100,23 +100,22 @@ impl View for Auth {
 
             Message::Connect => {
                 info!("attempting connexion");
-                Command::perform(
-                    connect(context.connection_info.clone()),
-                    move |ret| match ret {
-                        Ok(join) => Message::Connected,
-                        Err(err) => Message::Error(err.to_string()),
-                    },
-                )
+                if let Some(c) = &mut context.worker_channel {
+                    c.send(connection::InputMessage::Connect(context.connection_info.clone()));
+                }
+
+                Command::none()
+            }
+
+            Message::WSEvent(connection::Event::APMessage(crate::ap::messages::APMessage::Connected(_))) => {
+                context.save();
+                Command::perform(async{}, |_| Message::ChangePage(Pages::Dashboard))
             }
 
             Message::Error(err) => {
                 error!("{}", err);
 
                 Command::none()
-            }
-            Message::Connected => {
-                context.save();
-                Command::perform(async{}, |_| Message::ChangePage(Pages::Dashboard))
             }
             _ => { Command::none() }
         }
