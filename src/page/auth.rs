@@ -109,6 +109,7 @@ impl View for Auth {
 
             Message::WSEvent(connection::Event::APMessage(crate::ap::messages::APServerMessage::Connected(_))) => {
                 context.save();
+                info!("Logged in");
                 Command::perform(async{}, |_| Message::ChangePage(Pages::Dashboard))
             }
 

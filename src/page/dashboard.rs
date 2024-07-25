@@ -1,10 +1,7 @@
-use std::fmt::format;
-
 use iced::{widget::row, Command};
-use iced::widget::{image, text, text_input, Space};
-use tracing::{error, info};
+use iced::widget::{text, Space};
 
-use super::{Context, Message, View};
+use super::View;
 
 pub struct Dashboard {
 }
