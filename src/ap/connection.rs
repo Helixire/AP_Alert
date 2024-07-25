@@ -1,14 +1,16 @@
-use futures_util::{select, SinkExt, StreamExt};
+use std::time::Duration;
+
+use futures_util::{select, FutureExt, SinkExt, StreamExt};
 
 use iced::{futures::channel::mpsc, subscription};
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpStream;
 use tokio_tungstenite::{tungstenite::Message, MaybeTlsStream, WebSocketStream};
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
-use crate::ap::messages::Connect;
+use crate::ap::messages::{APClientMessage, Connect};
 
-use super::messages::APMessage;
+use super::messages::APServerMessage;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConnectionInfo {
@@ -32,7 +34,7 @@ impl Default for ConnectionInfo {
 #[derive(Debug, Clone)]
 pub enum Event {
     WorkerReady(Connection),
-    APMessage(super::messages::APMessage),
+    APMessage(super::messages::APServerMessage),
 }
 
 #[derive(Debug, Clone)]
@@ -76,13 +78,20 @@ pub fn connect() -> iced::Subscription<Event> {
                             }
                             Ok(server) => {
                                 state = State::Connected(server);
+                                continue;
                             }
                         }
                     }
 
-                    match receiver.select_next_some().await {
-                        InputMessage::Connect(info) => connection_info = Some(info),
-                    };
+                    select! {
+                        input = receiver.select_next_some() => {
+                            match input {
+                                InputMessage::Connect(info) => connection_info = Some(info),
+                            };
+                        }
+
+                        _ = tokio::time::sleep(Duration::new(5, 0)).fuse() => {}
+                    }
                 }
                 State::Connected(server) => {
                     let mut fused_websocket = server.by_ref().fuse();
@@ -91,14 +100,15 @@ pub fn connect() -> iced::Subscription<Event> {
                         message = fused_websocket.select_next_some() => {
                             match message {
                                 Ok(Message::Text(t)) => {
-                                    match serde_json::from_str::<Vec<APMessage>>(&t) {
+                                    match serde_json::from_str::<Vec<APServerMessage>>(&t) {
                                         Err(err) => error!("Failed converting to APMessage {:?}", err),
                                         Ok(messages) => {
                                             for message in messages {
+                                                debug!("{:?}", message);
                                                 match message {
-                                                    APMessage::RoomInfo(_) => {
+                                                    APServerMessage::RoomInfo(_) => {
                                                         if let Some(info) = &connection_info {
-                                                            let message = APMessage::Connect(Connect {
+                                                            let message = APClientMessage::Connect(Connect {
                                                                 name: info.slot.clone(),
                                                                 password: info.password.clone(),
                                                                 ..Default::default()

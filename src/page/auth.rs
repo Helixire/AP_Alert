@@ -107,7 +107,7 @@ impl View for Auth {
                 Command::none()
             }
 
-            Message::WSEvent(connection::Event::APMessage(crate::ap::messages::APMessage::Connected(_))) => {
+            Message::WSEvent(connection::Event::APMessage(crate::ap::messages::APServerMessage::Connected(_))) => {
                 context.save();
                 Command::perform(async{}, |_| Message::ChangePage(Pages::Dashboard))
             }
